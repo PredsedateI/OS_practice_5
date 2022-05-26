@@ -25,23 +25,22 @@ struct data {
 
 bool firstFinished, secondFinished, thirdFinished, firstTimeOut, secondTimeOut, thirdTimeOut;
 int priority[3];
+bool paused[3];
 data firstData, secondData, thirdData;
 std::mutex patrol;
 
 int main() {
-	firstFinished = false, secondFinished = false, thirdFinished = false, firstTimeOut = false, secondTimeOut = false, thirdTimeOut = false;
+	firstFinished = false, secondFinished = false, thirdFinished = false, paused[0] = false, paused[1] = false, paused[2] = false, firstTimeOut = false, secondTimeOut = false, thirdTimeOut = false;
 	priority[0] = 1, priority[1] = 1, priority[2] = 1;
-
 	CONSOLE_CURSOR_INFO inf;
 	GetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &inf);
 	inf.bVisible = false;
 	SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &inf);
-
 	std::thread keyscanner(keyscan);
-	std::cout << " > 1st thread: Probability of rolling a five on a dice\n\n    Priority: |\n    Progress: __________ 0%\n\n   2nd thread: Probability of getting a royal flush in a four-player game\n\n    Priority: |\n    Progress: __________ 0%\n\n   3rd thread: 33\n\n    Priority: |\n    Progress: __________ 0%\n\n" << char(24) << '/' << char(25) << "\n+/-";
+	std::cout << " > 1st thread: Probability of rolling a five on a dice\n\n    Priority: |\n    Progress: __________ 0%\n\n   2nd thread: Probability of getting a royal flush in a four-player game\n\n    Priority: |\n    Progress: __________ 0%\n\n   3rd thread: Probability of getting tails 10 times in a row\n\n    Priority: |\n    Progress: __________ 0%\n\n" << char(24) << '/' << char(25) << "\n+/-\nspace";
 	while (!(firstFinished and secondFinished and thirdFinished)) {
 		long ts, ct = 0;
-		if (!firstFinished and priority[0]) {
+		if (!firstFinished and !paused[0] and priority[0]) {
 			ts = clock();
 			firstTimeOut = false;
 			std::thread firstThread(firstTask);
@@ -54,7 +53,7 @@ int main() {
 				}
 			}
 		}
-		if (!secondFinished and priority[1]) {
+		if (!secondFinished and !paused[1] and priority[1]) {
 			ts = clock();
 			secondTimeOut = false;
 			std::thread secondThread(secondTask);
@@ -67,7 +66,7 @@ int main() {
 				}
 			}
 		}
-		if (!thirdFinished and priority[2]) {
+		if (!thirdFinished and !paused[2] and priority[2]) {
 			ts = clock();
 			thirdTimeOut = false;
 			std::thread thirdThread(thirdTask);
@@ -87,7 +86,7 @@ int main() {
 void keyscan() {
 	short pos = 0;
 	for (;;) {
-		if (GetKeyState(VK_UP) & 32768) { 
+		if (GetKeyState(VK_UP) & 32768) {
 			draw(1, pos * 5, ' ');
 			pos = (2 + pos) % 3;
 			draw(1, pos * 5, '>');
@@ -109,6 +108,12 @@ void keyscan() {
 		if (GetKeyState(VK_OEM_PLUS) & 32768 and GetKeyState(VK_SHIFT) & 32768) {
 			priority[pos] ++;
 			draw(13 + priority[pos], pos * 5 + 2, 124);
+			Sleep(200);
+		}
+		if (GetKeyState(VK_SPACE) & 32768) {
+			paused[pos] = !paused[pos];
+			if (paused[pos]) draw(4, pos * 5 + 1, "Paused                             ");
+			else draw(4, pos * 5 + 1, "      ");
 			Sleep(200);
 		}
 	}
@@ -134,7 +139,7 @@ void firstTask() {
 	unsigned long long i = firstData.i;
 	unsigned long long amount = firstData.c;
 	draw(4, 1, "Rolling a dice 1.800.000.000 times");
-	for (; (!firstTimeOut) and (i < 1800000000);) {
+	for (; (!firstTimeOut) and (!paused[0]) and (i < 1800000000);) {
 		if (rand() % 6 + 1 == 5) amount++;
 		i++;
 		if (i % 18000000 == 0) {
@@ -145,7 +150,7 @@ void firstTask() {
 	}
 	firstData.i = i;
 	firstData.c = amount;
-	draw(4, 1, "Waiting...                        ");
+	if (!paused[0]) draw(4, 1, "Waiting...                        ");
 	if (i == 1800000000) {
 		firstFinished = true;
 		draw(4, 1, "This probability is " + std::to_string((double)amount / (double)i * 100) + "%");
@@ -159,7 +164,7 @@ void secondTask() {
 	unsigned long long i = secondData.i;
 	unsigned long long amount = secondData.c;
 	draw(4, 6, "Dealing cards 360.000.000 times");
-	for (; (!secondTimeOut) and (i < 360000000);) {
+	for (; (!secondTimeOut) and (!paused[1]) and (i < 360000000);) {
 		short pool[13];
 		for (short j = 0; j < 13;) {
 			pool[j] = rand() % 52;
@@ -192,7 +197,7 @@ void secondTask() {
 	}
 	secondData.i = i;
 	secondData.c = amount;
-	draw(4, 6, "Waiting...                       ");
+	if (!paused[1]) draw(4, 6, "Waiting...                       ");
 	if (i == 360000000) {
 		secondFinished = true;
 		draw(4, 6, "This probability is " + std::to_string((double)amount / (double)i * 100) + "%");
@@ -202,8 +207,25 @@ void secondTask() {
 
 void thirdTask() {
 	patrol.lock();
-	for (; (!thirdTimeOut);) {
-		
+	srand(time(0));
+	unsigned long long i = thirdData.i;
+	unsigned long long amount = thirdData.c;
+	draw(4, 11, "Tossing a coin 10.000.000.000 times");
+	for (; (!thirdTimeOut) and (!paused[2]) and (i < 1000000000);) {
+		if (rand() % 2) if (rand() % 2) if (rand() % 2) if (rand() % 2) if (rand() % 2) if (rand() % 2) if (rand() % 2) if (rand() % 2) if (rand() % 2) if (rand() % 2) amount++;
+		i++;
+		if (i % 10000000 == 0) {
+			thirdData.percent++;
+			draw(25, 13, std::to_string(thirdData.percent) + "%");
+			if (thirdData.percent % 10 == 0) draw(13 + thirdData.percent / 10, 13, 219);
+		}
+	}
+	thirdData.i = i;
+	thirdData.c = amount;
+	if (!paused[1]) draw(4, 11, "Waiting...                         ");
+	if (i == 1000000000) {
+		secondFinished = true;
+		draw(4, 11, "This probability is " + std::to_string((double)amount / (double)i * 100) + "%");
 	}
 	patrol.unlock();
 }
